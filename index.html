@@ -354,7 +354,7 @@
   <div id="regScreen">
     <div class="logo-domru">ДОМ.РУ</div>
     <div class="game-title">🎮 MARIO<br>RUNNER</div>
-    <div class="game-subtitle">Собирай продукты Дом.ру за 1 минуту!<br>3 попытки — побеждает лучший результат<br>👆 Тап — прыжок · 👆👆 Двойной тап — двойной прыжок</div>
+    <div class="game-subtitle">Собирай продукты Дом.ру за 1 минуту!<br>3 попытки — побеждает лучший результат</div>
 
     <div class="prizes-grid">
       <div class="prize-item">
@@ -489,7 +489,6 @@ const mario = {
   x: 0, y: 0, w: 36, h: 44,
   vy: 0, jumping: false, onGround: true,
   frame: 0, frameTimer: 0,
-  doubleJumpUsed: false,
 };
 
 let boxes = [];
@@ -660,16 +659,11 @@ function addFloatingText(x, y, text, color) {
 
 function jump() {
   if(!gameRunning) return;
-  const dpr = window.devicePixelRatio;
   if(mario.onGround) {
+    const dpr = window.devicePixelRatio;
     mario.vy = -16*dpr;
     mario.onGround = false;
     mario.jumping = true;
-    mario.doubleJumpUsed = false;
-  } else if(!mario.doubleJumpUsed) {
-    mario.vy = -13*dpr;
-    mario.doubleJumpUsed = true;
-    addParticles(mario.x + mario.w/2, mario.y + mario.h/2, '#a78bfa');
   }
 }
 
@@ -684,12 +678,7 @@ function updateGame(dt) {
   const dpr = window.devicePixelRatio;
   gameTime += dt;
 
-  // Speed: smooth ramp with strong acceleration in last 20s
-  // t=0→0s: 3x, t=0.67→40s: 7x, t=1→60s: 18x (exponential curve at the end)
-  const t = gameTime/1000/GAME_DURATION;
-  const baseSpeed = 3 + t*4;                          // linear 3→7
-  const boost = Math.pow(Math.max(0, t - 0.6) / 0.4, 2) * 11; // exponential kick after 36s
-  speed = (baseSpeed + boost) * dpr;
+  speed = (3 + (gameTime/1000/GAME_DURATION)*7)*dpr;
 
   mario.vy += 0.7*dpr;
   mario.y += mario.vy;
@@ -698,7 +687,6 @@ function updateGame(dt) {
     mario.vy = 0;
     mario.onGround = true;
     mario.jumping = false;
-    mario.doubleJumpUsed = false;
   }
 
   mario.frameTimer += dt;
@@ -859,7 +847,6 @@ function startGame() {
   mario.vy = 0;
   mario.onGround = true;
   mario.jumping = false;
-  mario.doubleJumpUsed = false;
 
   document.getElementById('scoreVal').textContent = '0';
   document.getElementById('timerVal').textContent = '60';
