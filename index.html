@@ -178,7 +178,7 @@
   <div class="logo-domru">ДОМ.РУ</div>
   <div class="game-title">🎮 MARIO RUNNER</div>
   <div class="game-subtitle">
-    Собери максимальное количество продуктов Дом.ру за 60 секунд!<br>
+    Собери как можно больше продуктов Дом.ру за 60 секунд!<br>
     👆 Тап — прыжок &nbsp;·&nbsp; 👆👆 Двойной тап — двойной прыжок<br>
     ⚠️ Нижние ящики — ловушки, отнимают очки!<br>
     3 попытки — в зачёт идёт лучший результат
@@ -316,7 +316,47 @@ const SPEED_BOOST_DURATION = 3000; // ms
 // ─── STATE ──────────────────────────────────────────────────────────────────
 let playerName='', currentTry=0, triesScores=[];
 let allPlayers=[];
-try { allPlayers=JSON.parse(localStorage.getItem('domru_players')||'[]'); } catch(e){}
+
+// ─── FIREBASE ────────────────────────────────────────────────────────────────
+const FB_URL='https://studia-9629e-default-rtdb.firebaseio.com/leaderboard';
+
+async function fbGetAll(){
+  try{
+    const r=await fetch(FB_URL+'.json');
+    const data=await r.json();
+    if(!data) return [];
+    return Object.entries(data).map(([key,v])=>({...v,_key:key}));
+  }catch(e){ return []; }
+}
+
+async function fbSave(name,score,inProgress){
+  try{
+    const all=await fbGetAll();
+    const ex=all.find(p=>p.name===name);
+    if(ex){
+      const newScore=Math.max(score,ex.score);
+      if(newScore!==ex.score || ex.inProgress!==inProgress){
+        await fetch(`${FB_URL}/${ex._key}.json`,{
+          method:'PATCH',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({score:newScore,inProgress})
+        });
+      }
+    } else {
+      await fetch(FB_URL+'.json',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,score,inProgress})
+      });
+    }
+  }catch(e){}
+}
+
+async function loadLeaderboard(){
+  const data=await fbGetAll();
+  allPlayers=data.sort((a,b)=>b.score-a.score);
+  return allPlayers;
+}
 
 let score=0, timeLeft=GAME_DURATION, gameRunning=false, collected={}, trapHits=0;
 let animFrame, timerInterval;
@@ -542,18 +582,10 @@ function checkBoostExpired(now){
   }
 }
 
-// ─── SAVE TO LEADERBOARD (mid-game) ─────────────────────────────────────────
+// ─── SAVE TO LEADERBOARD ────────────────────────────────────────────────────
 function saveCurrentScore(){
   if(!playerName) return;
-  const existing=allPlayers.findIndex(p=>p.name===playerName);
-  if(existing>=0){
-    if(score>allPlayers[existing].score) allPlayers[existing].score=score;
-    allPlayers[existing].inProgress=(timeLeft>0);
-  } else {
-    allPlayers.push({name:playerName,score,inProgress:true});
-  }
-  allPlayers.sort((a,b)=>b.score-a.score);
-  try{localStorage.setItem('domru_players',JSON.stringify(allPlayers));}catch(e){}
+  fbSave(playerName, score, timeLeft>0);
 }
 
 // ─── UPDATE GAME ─────────────────────────────────────────────────────────────
@@ -768,17 +800,9 @@ function endGame(){
   clearInterval(timerInterval);
   cancelAnimationFrame(animFrame);
   triesScores.push(score);
-
   const best=Math.max(...triesScores);
-  const existing=allPlayers.findIndex(p=>p.name===playerName);
-  if(existing>=0){
-    allPlayers[existing].score=best;
-    allPlayers[existing].inProgress=false;
-  } else {
-    allPlayers.push({name:playerName,score:best,inProgress:false});
-  }
-  allPlayers.sort((a,b)=>b.score-a.score);
-  try{localStorage.setItem('domru_players',JSON.stringify(allPlayers));}catch(e){}
+  // Save final result to Firebase (inProgress=false)
+  fbSave(playerName, best, false);
   showResult();
 }
 
@@ -820,16 +844,22 @@ function showResult(){
     grid.appendChild(div);
   });
 
-  // Leaderboard
+  // Leaderboard — load from Firebase
   const lbRows=document.getElementById('lbRows');
-  lbRows.innerHTML='';
-  allPlayers.slice(0,10).forEach((p,i)=>{
-    const row=document.createElement('div');
-    row.className='lb-row'+(p.name===playerName?' me':'');
-    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
-    const tag=p.inProgress?' <span class="lb-tag">(в игре)</span>':'';
-    row.innerHTML=`<span class="lb-rank">${medal}</span><span class="lb-pname">${p.name}${tag}</span><span class="lb-pscore">${p.score}</span>`;
-    lbRows.appendChild(row);
+  lbRows.innerHTML='<div style="text-align:center;color:#a78bfa;font-size:12px;padding:8px">Загрузка...</div>';
+  loadLeaderboard().then(players=>{
+    lbRows.innerHTML='';
+    players.slice(0,10).forEach((p,i)=>{
+      const row=document.createElement('div');
+      row.className='lb-row'+(p.name===playerName?' me':'');
+      const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+      const tag=p.inProgress?' <span class="lb-tag">(в игре)</span>':'';
+      row.innerHTML=`<span class="lb-rank">${medal}</span><span class="lb-pname">${p.name}${tag}</span><span class="lb-pscore">${p.score}</span>`;
+      lbRows.appendChild(row);
+    });
+    if(players.length===0){
+      lbRows.innerHTML='<div style="text-align:center;color:#6b7280;font-size:12px;padding:8px">Пока никто не играл</div>';
+    }
   });
 
   const btns=document.getElementById('resultBtns');
