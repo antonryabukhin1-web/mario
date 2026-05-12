@@ -374,7 +374,7 @@ const mario={
 };
 
 let boxes=[],fallingItems=[],particles=[],clouds=[],bgStars=[];
-let speed=3, spawnTimer=0, cloudTimer=0, gameTime=0, lastTime=null;
+let speed=4.5, spawnTimer=0, cloudTimer=0, gameTime=0, lastTime=null;
 let highBoxTimer=0; // separate timer for high boxes
 
 // ─── CANVAS INIT ────────────────────────────────────────────────────────────
@@ -597,7 +597,7 @@ function updateGame(dt,now){
 
   // Speed: exponential ramp after 36s
   const t=Math.min(1,gameTime/1000/GAME_DURATION);
-  const baseSpeed=3+t*4;
+  const baseSpeed = 4.5 + t*4;
   const boost=Math.pow(Math.max(0,t-0.6)/0.4,2)*11;
   const speedMultiplier=(speedBoostEnd>0 && now<speedBoostEnd)?2:1;
   speed=(baseSpeed+boost)*dpr*speedMultiplier;
@@ -772,7 +772,7 @@ function startGame(){
   initCanvas();
   score=0; timeLeft=GAME_DURATION; collected={}; trapHits=0;
   boxes=[]; fallingItems=[]; particles=[]; clouds=[];
-  speed=3*(window.devicePixelRatio||1);
+  speed=4.5*(window.devicePixelRatio||1);
   spawnTimer=800; cloudTimer=1000; highBoxTimer=4000;
   gameTime=0; lastTime=null; speedBoostEnd=0;
   mario.y=groundY-mario.h; mario.vy=0;
